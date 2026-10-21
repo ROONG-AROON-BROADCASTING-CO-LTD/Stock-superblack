@@ -1,36 +1,55 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# SUPERBLACK Workspace
 
-## Getting Started
+แดชบอร์ดภาษาไทยสำหรับสต๊อกสินค้า ลงเวลาเข้า–ออกงาน และบันทึกการลา พัฒนาด้วย Next.js, React, TypeScript และ Bun
 
-First, run the development server:
+หน้าจอใช้ components ทางการจาก shadcn/ui รูปแบบ Base Nova ได้แก่ Sidebar, Sheet, Card, Table, Dialog, Field, Input, Native Select, Textarea, Tabs, Badge, Avatar, Empty, Alert และ Sonner ใช้ Tailwind utilities จัด layout และ responsive โดย `app/globals.css` มีเฉพาะ imports, theme tokens และ base layer ของ shadcn ไม่มี custom CSS สำหรับหน้าจอ
+
+## เริ่มใช้งาน
+
+รันจากโฟลเดอร์ที่มี `package.json` และ `bun.lock`:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cd /Users/pachara/Documents/GitHub/Stock-superblack/stock-superblack
+bun install --frozen-lockfile
+bun run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+เปิด http://localhost:3000 โดยใช้ username/password ที่กำหนดใน `.env` ผ่าน `AUTH_USERNAME` และ `AUTH_PASSWORD` ไฟล์นี้ถูกยกเว้นจาก Git และใช้เฉพาะฝั่งเซิร์ฟเวอร์ ให้สร้างไฟล์นี้เองเมื่อ clone ไปเครื่องใหม่
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+bun run lint
+bun run build
+bun run start
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## การใช้งาน
 
-## Learn More
+- `/`: เพิ่มและแก้ไขสินค้า ค้นหาตามชื่อ/รหัส กรองหมวดหมู่/สถานะ และดูสินค้าที่เหลือไม่เกินจำนวนขั้นต่ำ
+- ส่งออก Excel `.xlsx` ของสินค้าทั้งหมด โดยต้องระบุชื่อผู้ส่งออกทุกครั้ง รายงานมีชื่อ วันเวลาส่งออก และข้อมูลสินค้าที่บันทึกจริง
+- `/attendance`: เช็คอิน เช็คเอ้าท์ ดูประวัติและระยะเวลาทำงาน รวมถึงบันทึกลากิจ ลาป่วย ลาพักร้อน และลาอื่นๆ พร้อมวันที่และเหตุผล
+- แสดงชื่อผู้ใช้งานจากบัญชีที่เข้าสู่ระบบ เวลาใช้เขต Asia/Bangkok
+- รองรับจอมือถือด้วย sidebar แบบพับและตารางที่เลื่อนแนวนอนได้
 
-To learn more about Next.js, take a look at the following resources:
+## การเก็บข้อมูล
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+เริ่มต้นโดยไม่มีข้อมูลสินค้า ประวัติลงเวลา หรือวันลา ข้อมูลที่กรอกจะถูกบันทึกฝั่งเซิร์ฟเวอร์ลง `.data/database.json` และยังอยู่หลังรีเฟรชหรือรีสตาร์ตเซิร์ฟเวอร์ ไฟล์ข้อมูลถูกยกเว้นจาก Git ควรสำรองโฟลเดอร์ `.data` เมื่อต้องการเก็บข้อมูล
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+เวอร์ชันนี้เหมาะกับการรันในเครื่องหรือเซิร์ฟเวอร์เดียวที่มีดิสก์ถาวร หากนำไปใช้กับ serverless หรือหลาย instance ต้องเปลี่ยนส่วนเก็บข้อมูลเป็นฐานข้อมูลถาวร การลาเป็นการบันทึกประวัติ ยังไม่มีขั้นตอนอนุมัติหรือคำนวณสิทธิลาคงเหลือ
 
-## Deploy on Vercel
+## โครงสร้าง
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```text
+app/                       หน้าจอและ API routes
+  api/auth/                เข้าสู่ระบบและออกจากระบบ
+  api/workspace/           อ่านและบันทึกข้อมูล
+  api/inventory/export/    สร้างรายงาน Excel
+  attendance/              หน้าลงเวลาและการลา
+components/dashboard/      โครงแดชบอร์ดและ dialog
+components/inventory/      หน้าสต๊อกสินค้า
+components/attendance/     หน้าลงเวลาและการลา
+components/ui/             components ทางการจาก shadcn/ui
+hooks/use-mobile.ts        ตรวจขนาดจอสำหรับ Sidebar
+lib/server/                session และการเก็บข้อมูลบนเซิร์ฟเวอร์
+lib/api-client.ts          ตัวเรียก API ฝั่ง client
+lib/types.ts               ชนิดข้อมูลที่ใช้ร่วมกัน
+```
