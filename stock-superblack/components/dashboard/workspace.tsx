@@ -1,7 +1,8 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Box, Clock3, LogOut } from "lucide-react";
+import { Box, Clock3, LogOut, ShieldCheck } from "lucide-react";
+import dynamic from "next/dynamic";
 import { Inventory } from "@/components/inventory/inventory";
 import { AttendancePanel } from "@/components/attendance/attendance-panel";
 import { Button } from "@/components/ui/button";
@@ -35,15 +36,28 @@ import {
   SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
-import type { Database } from "@/lib/types";
+import type { SessionUser, WorkspaceData } from "@/lib/types";
 import { api } from "@/lib/api-client";
+
+const AdminPanel = dynamic(
+  () =>
+    import("@/components/admin/admin-panel").then(
+      (module) => module.AdminPanel,
+    ),
+  {
+    loading: () => <p role="status">กำลังโหลดหน้าแอดมิน…</p>,
+  },
+);
+type Page = "inventory" | "attendance" | "admin";
 
 function WorkspaceNavigation({
   page,
   logout,
+  isAdmin,
 }: {
-  page: "inventory" | "attendance";
+  page: Page;
   logout: () => void;
+  isAdmin: boolean;
 }) {
   const { setOpenMobile } = useSidebar();
   return (
@@ -63,6 +77,19 @@ function WorkspaceNavigation({
           <SidebarGroupLabel>พื้นที่ทำงาน</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
+              {isAdmin && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    isActive={page === "admin"}
+                    tooltip="ผู้ดูแลระบบ"
+                    render={<Link href="/admin" />}
+                    onClick={() => setOpenMobile(false)}
+                  >
+                    <ShieldCheck />
+                    <span>ผู้ดูแลระบบ</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
               <SidebarMenuItem>
                 <SidebarMenuButton
                   isActive={page === "inventory"}
@@ -103,9 +130,10 @@ function WorkspaceNavigation({
   );
 }
 
-export function Workspace({ page }: { page: "inventory" | "attendance" }) {
+export function Workspace({ page }: { page: Page }) {
   const [user, setUser] = useState<string | null>(null);
-  const [data, setData] = useState<Database | null>(null);
+  const [session, setSession] = useState<SessionUser | null>(null);
+  const [data, setData] = useState<WorkspaceData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -115,6 +143,7 @@ export function Workspace({ page }: { page: "inventory" | "attendance" }) {
       .then(async (auth) => {
         if (!active) return;
         setUser(auth.username);
+        setSession(auth.username ? auth : null);
         if (auth.username) {
           const db = await api("/api/workspace");
           if (active) setData(db);
@@ -142,6 +171,7 @@ export function Workspace({ page }: { page: "inventory" | "attendance" }) {
       const auth = await api("/api/auth", Object.fromEntries(values));
       setData(await api("/api/workspace"));
       setUser(auth.username);
+      setSession(auth);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -152,6 +182,7 @@ export function Workspace({ page }: { page: "inventory" | "attendance" }) {
     try {
       await api("/api/auth", {}, "DELETE");
       setUser(null);
+      setSession(null);
       setData(null);
     } catch (e) {
       setError((e as Error).message);
@@ -182,14 +213,14 @@ export function Workspace({ page }: { page: "inventory" | "attendance" }) {
             <form onSubmit={login}>
               <FieldGroup>
                 <Field>
-                  <FieldLabel htmlFor="username">ชื่อผู้ใช้</FieldLabel>
+                  <FieldLabel htmlFor="username">อีเมล / ชื่อผู้ใช้</FieldLabel>
                   <Input
                     id="username"
                     name="username"
                     autoComplete="username"
                     required
                     maxLength={120}
-                    placeholder="กรอกชื่อผู้ใช้"
+                    placeholder="กรอกอีเมลหรือชื่อผู้ใช้"
                   />
                 </Field>
                 <Field>
@@ -217,22 +248,33 @@ export function Workspace({ page }: { page: "inventory" | "attendance" }) {
         </Card>
       </main>
     );
-  const title = page === "inventory" ? "สต๊อกสินค้า" : "เช็คอิน / เช็คเอ้าท์";
+  const title =
+    page === "admin"
+      ? "ผู้ดูแลระบบ"
+      : page === "inventory"
+        ? "สต๊อกสินค้า"
+        : "เช็คอิน / เช็คเอ้าท์";
   return (
     <TooltipProvider>
       <SidebarProvider>
-        <WorkspaceNavigation page={page} logout={logout} />
+        <WorkspaceNavigation
+          page={page}
+          logout={logout}
+          isAdmin={session?.role === "admin"}
+        />
         <SidebarInset className="min-w-0">
           <header className="flex min-h-16 items-center justify-between gap-3 border-b px-4 sm:px-6">
             <div className="flex min-w-0 items-center gap-2">
               <SidebarTrigger aria-label="เปิดหรือปิดเมนู" />
               <span className="truncate">{title}</span>
             </div>
-            <div className="flex shrink-0 items-center gap-2">
+            <div className="flex min-w-0 items-center gap-2">
               <Avatar>
                 <AvatarFallback>{user.charAt(0).toUpperCase()}</AvatarFallback>
               </Avatar>
-              <span>{user}</span>
+              <span className="max-w-40 truncate sm:max-w-none">
+                {session?.name || user}
+              </span>
             </div>
           </header>
           <div className="flex min-w-0 flex-1 flex-col gap-6 p-4 sm:p-6">
@@ -241,7 +283,17 @@ export function Workspace({ page }: { page: "inventory" | "attendance" }) {
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
-            {data ? (
+            {page === "admin" ? (
+              session?.role === "admin" ? (
+                <AdminPanel />
+              ) : (
+                <Alert variant="destructive">
+                  <AlertDescription>
+                    หน้านี้สำหรับผู้ดูแลระบบเท่านั้น
+                  </AlertDescription>
+                </Alert>
+              )
+            ) : data ? (
               page === "inventory" ? (
                 <Inventory products={data.products} mutate={mutate} />
               ) : (

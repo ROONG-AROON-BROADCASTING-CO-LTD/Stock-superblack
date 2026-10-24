@@ -1,16 +1,19 @@
-import { getUser } from "@/lib/server/auth";
+import { getSession } from "@/lib/server/auth";
 import { readDatabase, updateDatabase } from "@/lib/server/database";
+import { workspaceView } from "@/lib/server/views";
 export async function GET() {
-  if (!(await getUser()))
+  const user = await getSession();
+  if (!user)
     return Response.json({ error: "กรุณาเข้าสู่ระบบ" }, { status: 401 });
-  return Response.json(await readDatabase(), {
+  return Response.json(workspaceView(await readDatabase(), user), {
     headers: { "Cache-Control": "no-store" },
   });
 }
 export async function POST(request: Request) {
-  const username = await getUser();
-  if (!username)
+  const user = await getSession();
+  if (!user)
     return Response.json({ error: "กรุณาเข้าสู่ระบบ" }, { status: 401 });
+  const username = user.username;
   const body = await request.json().catch(() => null);
   if (!body)
     return Response.json({ error: "ข้อมูลไม่ถูกต้อง" }, { status: 400 });
@@ -41,6 +44,19 @@ export async function POST(request: Request) {
           throw Error("รหัสสินค้านี้มีอยู่แล้ว");
         const index = data.products.findIndex((item) => item.id === p.id);
         if (p.id && index < 0) throw Error("ไม่พบสินค้า");
+        const previous = index >= 0 ? data.products[index] : null;
+        if (previous && p.updatedAt !== previous.updatedAt)
+          throw Error(
+            "สินค้าถูกแก้ไขโดยผู้ใช้อื่นแล้ว กรุณารีเฟรชและลองอีกครั้ง",
+          );
+        if (
+          previous &&
+          previous.unit !== p.unit.trim() &&
+          previous.quantity > 0
+        )
+          throw Error(
+            "ไม่สามารถเปลี่ยนหน่วยขณะมีสินค้าคงเหลือ กรุณาสร้างรหัสสินค้าใหม่",
+          );
         const product = {
           id: p.id || crypto.randomUUID(),
           sku: p.sku.trim(),
@@ -53,6 +69,24 @@ export async function POST(request: Request) {
         };
         if (index >= 0) data.products[index] = product;
         else data.products.push(product);
+        const before = previous?.quantity ?? 0;
+        data.stockMovements.unshift({
+          id: crypto.randomUUID(),
+          productId: product.id,
+          sku: product.sku,
+          name: product.name,
+          unit: product.unit,
+          before,
+          after: product.quantity,
+          change: product.quantity - before,
+          kind: !previous
+            ? "created"
+            : before !== product.quantity
+              ? "adjusted"
+              : "updated",
+          username,
+          createdAt: now,
+        });
       } else if (body.action === "check-in") {
         if (
           data.attendance.some(
@@ -81,6 +115,8 @@ export async function POST(request: Request) {
           !/^\d{4}-\d{2}-\d{2}$/.test(leave.end) ||
           !Number.isFinite(Date.parse(leave.start)) ||
           !Number.isFinite(Date.parse(leave.end)) ||
+          new Date(leave.start).toISOString().slice(0, 10) !== leave.start ||
+          new Date(leave.end).toISOString().slice(0, 10) !== leave.end ||
           leave.start > leave.end ||
           typeof leave.reason !== "string" ||
           !leave.reason.trim() ||
@@ -95,10 +131,14 @@ export async function POST(request: Request) {
           end: leave.end,
           reason: leave.reason.trim(),
           createdAt: now,
+          status: "pending",
+          reviewedBy: null,
+          reviewedAt: null,
+          reviewNote: "",
         });
       } else throw Error("คำสั่งไม่ถูกต้อง");
     });
-    return Response.json(await readDatabase());
+    return Response.json(workspaceView(await readDatabase(), user));
   } catch (error) {
     return Response.json(
       { error: error instanceof Error ? error.message : "บันทึกไม่สำเร็จ" },

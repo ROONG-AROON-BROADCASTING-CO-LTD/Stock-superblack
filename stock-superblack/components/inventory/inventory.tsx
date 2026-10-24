@@ -84,6 +84,7 @@ export function Inventory({
         product: {
           ...f,
           id: product?.id,
+          updatedAt: product?.updatedAt,
           quantity: Number(f.quantity),
           minimum: Number(f.minimum),
         },

@@ -2,7 +2,8 @@
 import { useEffect, useState } from "react";
 import { Clock3, LogIn, LogOut, CalendarDays, Plus } from "lucide-react";
 import { Modal } from "@/components/dashboard/modal";
-import type { Database } from "@/lib/types";
+import type { WorkspaceData } from "@/lib/types";
+import { date, dateTime, leaveStatus } from "@/lib/format";
 
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -40,25 +41,12 @@ import {
 } from "@/components/ui/empty";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { DialogDescription } from "@/components/ui/dialog";
-function dateTime(value: string) {
-  return new Date(value).toLocaleString("th-TH", {
-    timeZone: "Asia/Bangkok",
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
-}
-function date(value: string) {
-  return new Date(`${value}T00:00:00+07:00`).toLocaleDateString("th-TH", {
-    timeZone: "Asia/Bangkok",
-    dateStyle: "medium",
-  });
-}
 export function AttendancePanel({
   data,
   user,
   mutate,
 }: {
-  data: Database;
+  data: WorkspaceData;
   user: string;
   mutate: (body: unknown) => Promise<void>;
 }) {
@@ -99,7 +87,7 @@ export function AttendancePanel({
       await mutate({ action: "leave", leave });
       setLeaveOpen(false);
       setTab("leave");
-      toast.success("บันทึกการลาเรียบร้อยแล้ว");
+      toast.success("ส่งคำขอลาแล้ว รอผู้ดูแลระบบอนุมัติ");
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -123,7 +111,7 @@ export function AttendancePanel({
           }}
         >
           <Plus data-icon="inline-start" />
-          บันทึกการลา
+          ส่งคำขอลา
         </Button>
       </div>
       {error && !leaveOpen && (
@@ -266,6 +254,8 @@ export function AttendancePanel({
                     <TableHead>ถึงวันที่</TableHead>
                     <TableHead>เหตุผล</TableHead>
                     <TableHead>วันที่บันทึก</TableHead>
+                    <TableHead>สถานะ</TableHead>
+                    <TableHead>ผลการพิจารณา</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -280,6 +270,31 @@ export function AttendancePanel({
                         {l.reason}
                       </TableCell>
                       <TableCell>{dateTime(l.createdAt)}</TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={
+                            l.status === "rejected"
+                              ? "destructive"
+                              : l.status === "approved"
+                                ? "default"
+                                : "secondary"
+                          }
+                        >
+                          {leaveStatus[l.status]}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="max-w-64 whitespace-normal wrap-break-word">
+                        {l.reviewedAt ? (
+                          <>
+                            <div>{l.reviewNote || "—"}</div>
+                            <p className="text-xs text-muted-foreground">
+                              {l.reviewedBy} · {dateTime(l.reviewedAt)}
+                            </p>
+                          </>
+                        ) : (
+                          "รอผู้ดูแลระบบพิจารณา"
+                        )}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -316,14 +331,14 @@ export function AttendancePanel({
       </Card>
       {leaveOpen && (
         <Modal
-          title="บันทึกการลา"
+          title="ส่งคำขอลา"
           onClose={() => {
             setLeaveOpen(false);
             setError("");
           }}
         >
           <DialogDescription>
-            ระบุรายละเอียดวันลา ข้อมูลจะถูกบันทึกในประวัติของคุณ
+            ระบุรายละเอียดวันลาเพื่อส่งให้ผู้ดูแลระบบพิจารณาอนุมัติ
           </DialogDescription>
           <form onSubmit={submitLeave}>
             <FieldGroup>
@@ -376,7 +391,7 @@ export function AttendancePanel({
                   ยกเลิก
                 </Button>
                 <Button type="submit" disabled={busy}>
-                  {busy ? "กำลังบันทึก…" : "บันทึกการลา"}
+                  {busy ? "กำลังส่ง…" : "ส่งคำขอลา"}
                 </Button>
               </Field>
             </FieldGroup>
