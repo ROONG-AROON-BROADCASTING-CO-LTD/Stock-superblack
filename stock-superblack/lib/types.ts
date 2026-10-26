@@ -62,9 +62,35 @@ export type WorkspaceData = {
 export type Database = WorkspaceData & {
   employees: (Employee & { passwordHash: string })[];
   stockMovements: StockMovement[];
+  schedules: WorkSchedule[];
 };
 export type AdminData = {
   employees: Employee[];
   leaves: Leave[];
   stockMovements: StockMovement[];
+};
+
+export type ScheduleMode = "days-off" | "shifts" | "both";
+export type WorkShift = { id: string; name: string; start: string; end: string };
+export type ScheduleSettings = {
+  mode: ScheduleMode;
+  start: string;
+  end: string;
+  employeeIds: string[];
+  daysOff: number;
+  shifts: WorkShift[];
+};
+export type ScheduleEntry = {
+  employeeId: string;
+  date: string;
+  status: "day-off" | "work" | "leave";
+  shiftId: string | null;
+};
+export type WorkSchedule = {
+  id: string;
+  createdAt: string;
+  createdBy: string;
+  settings: ScheduleSettings;
+  employees: Pick<Employee, "id" | "name" | "username" | "department">[];
+  entries: ScheduleEntry[];
 };

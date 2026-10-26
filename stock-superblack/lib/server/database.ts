@@ -12,6 +12,7 @@ export async function readDatabase(): Promise<Database> {
       ...data,
       employees: data.employees ?? [],
       stockMovements: data.stockMovements ?? [],
+      schedules: data.schedules ?? [],
       leaves: data.leaves.map((leave) => ({
         ...leave,
         status: leave.status ?? "pending",
@@ -28,6 +29,7 @@ export async function readDatabase(): Promise<Database> {
         leaves: [],
         employees: [],
         stockMovements: [],
+        schedules: [],
       };
     throw error;
   }

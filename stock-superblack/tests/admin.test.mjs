@@ -17,7 +17,9 @@ mock.module("next/headers", () => ({
   }),
 }));
 const auth = await import("../app/api/auth/route.ts");
+const adminLogin = await import("../app/api/admin/login/route.ts");
 const admin = await import("../app/api/admin/route.ts");
+const schedules = await import("../app/api/admin/schedules/route.ts");
 const workspace = await import("../app/api/workspace/route.ts");
 const { readDatabase } = await import("../lib/server/database.ts");
 const request = (body) =>
@@ -94,6 +96,31 @@ test("admin requires authentication; employee cannot read or mutate admin data",
       )
     ).status,
   ).toBe(403);
+  expect((await workspace.GET()).status).toBe(200);
+});
+
+test("dedicated admin login accepts admins, rejects employees and preserves existing sessions on failure", async () => {
+  expect((await adminLogin.POST(request({}))).status).toBe(400);
+  expect((await adminLogin.POST(request({ username: process.env.AUTH_USERNAME, password: "wrong" }))).status).toBe(401);
+  expect(jar.size).toBe(0);
+  const response = await adminLogin.POST(request({
+    username: process.env.AUTH_USERNAME,
+    password: process.env.AUTH_PASSWORD,
+  }));
+  expect(response.status).toBe(200);
+  expect((await response.json()).role).toBe("admin");
+  expect((await admin.GET()).status).toBe(200);
+  await createEmployee();
+  await auth.DELETE();
+  expect((await admin.GET()).status).toBe(401);
+  const employeeCredentials = { username: "employee@example.test", password: "employee-test-password" };
+  expect((await adminLogin.POST(request(employeeCredentials))).status).toBe(401);
+  expect(jar.size).toBe(0);
+  await signIn(employeeCredentials.username, employeeCredentials.password);
+  const employeeCookie = jar.get("superblack-session");
+  expect((await adminLogin.POST(request(employeeCredentials))).status).toBe(401);
+  expect(jar.get("superblack-session")).toBe(employeeCookie);
+  expect((await admin.GET()).status).toBe(403);
   expect((await workspace.GET()).status).toBe(200);
 });
 
@@ -324,4 +351,28 @@ test("invalid calendar dates and reversed ranges are rejected", async () => {
       ).status,
     ).toBe(400);
   }
+});
+
+test("schedules are admin-only, persist independently, and failed generation never overwrites history", async () => {
+  expect((await schedules.GET()).status).toBe(401);
+  expect((await schedules.POST(request({}))).status).toBe(401);
+  await signIn();
+  expect((await (await schedules.GET()).json()).schedules).toEqual([]);
+  const employee = (await (await createEmployee()).json()).employees[0];
+  const config = { mode: "both", start: "2026-11-01", end: "2026-11-07", employeeIds: [employee.id], daysOff: 1,
+    shifts: [{ id: "day", name: "กลางวัน", start: "08:00", end: "16:00" }] };
+  const created = await schedules.POST(request(config));
+  expect(created.status).toBe(200);
+  const first = (await created.json()).schedule;
+  expect(first.createdBy).toBe(process.env.AUTH_USERNAME);
+  expect(first.entries).toHaveLength(7);
+  expect((await schedules.POST(request({ ...config, daysOff: 50 }))).status).toBe(400);
+  expect((await readDatabase()).schedules).toEqual([first]);
+  expect((await schedules.POST(request({ ...config, mode: "shifts" }))).status).toBe(200);
+  expect((await readDatabase()).schedules).toHaveLength(2);
+  expect((await readDatabase()).schedules[1]).toEqual(first);
+  await signIn("employee@example.test", "employee-test-password");
+  expect((await schedules.GET()).status).toBe(403);
+  expect((await schedules.POST(request(config))).status).toBe(403);
+  expect((await (await workspace.GET()).json()).schedules).toBeUndefined();
 });

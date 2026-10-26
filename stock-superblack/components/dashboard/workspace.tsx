@@ -1,8 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Box, Clock3, LogOut, ShieldCheck } from "lucide-react";
-import dynamic from "next/dynamic";
+import { Box, Clock3, LogOut } from "lucide-react";
 import { Inventory } from "@/components/inventory/inventory";
 import { AttendancePanel } from "@/components/attendance/attendance-panel";
 import { Button } from "@/components/ui/button";
@@ -39,25 +38,14 @@ import {
 import type { SessionUser, WorkspaceData } from "@/lib/types";
 import { api } from "@/lib/api-client";
 
-const AdminPanel = dynamic(
-  () =>
-    import("@/components/admin/admin-panel").then(
-      (module) => module.AdminPanel,
-    ),
-  {
-    loading: () => <p role="status">กำลังโหลดหน้าแอดมิน…</p>,
-  },
-);
-type Page = "inventory" | "attendance" | "admin";
+type Page = "inventory" | "attendance";
 
 function WorkspaceNavigation({
   page,
   logout,
-  isAdmin,
 }: {
   page: Page;
   logout: () => void;
-  isAdmin: boolean;
 }) {
   const { setOpenMobile } = useSidebar();
   return (
@@ -77,19 +65,6 @@ function WorkspaceNavigation({
           <SidebarGroupLabel>พื้นที่ทำงาน</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {isAdmin && (
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    isActive={page === "admin"}
-                    tooltip="ผู้ดูแลระบบ"
-                    render={<Link href="/admin" />}
-                    onClick={() => setOpenMobile(false)}
-                  >
-                    <ShieldCheck />
-                    <span>ผู้ดูแลระบบ</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              )}
               <SidebarMenuItem>
                 <SidebarMenuButton
                   isActive={page === "inventory"}
@@ -248,20 +223,11 @@ export function Workspace({ page }: { page: Page }) {
         </Card>
       </main>
     );
-  const title =
-    page === "admin"
-      ? "ผู้ดูแลระบบ"
-      : page === "inventory"
-        ? "สต๊อกสินค้า"
-        : "เช็คอิน / เช็คเอ้าท์";
+  const title = page === "inventory" ? "สต๊อกสินค้า" : "เช็คอิน / เช็คเอ้าท์";
   return (
     <TooltipProvider>
       <SidebarProvider>
-        <WorkspaceNavigation
-          page={page}
-          logout={logout}
-          isAdmin={session?.role === "admin"}
-        />
+        <WorkspaceNavigation page={page} logout={logout} />
         <SidebarInset className="min-w-0">
           <header className="flex min-h-16 items-center justify-between gap-3 border-b px-4 sm:px-6">
             <div className="flex min-w-0 items-center gap-2">
@@ -283,17 +249,7 @@ export function Workspace({ page }: { page: Page }) {
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
-            {page === "admin" ? (
-              session?.role === "admin" ? (
-                <AdminPanel />
-              ) : (
-                <Alert variant="destructive">
-                  <AlertDescription>
-                    หน้านี้สำหรับผู้ดูแลระบบเท่านั้น
-                  </AlertDescription>
-                </Alert>
-              )
-            ) : data ? (
+            {data ? (
               page === "inventory" ? (
                 <Inventory products={data.products} mutate={mutate} />
               ) : (

@@ -60,6 +60,7 @@ export async function getUser() {
 export async function login(
   username: string,
   password: string,
+  requiredRole?: SessionUser["role"],
 ): Promise<SessionUser | null> {
   if (
     !process.env.AUTH_USERNAME ||
@@ -89,6 +90,7 @@ export async function login(
       role: "employee",
     };
   }
+  if (requiredRole && user.role !== requiredRole) return null;
   const value = `${Date.now() + 1000 * 60 * 60 * 12}.${user.id}`;
   (await cookies()).set(cookieName, `${value}.${sign(value)}`, {
     httpOnly: true,

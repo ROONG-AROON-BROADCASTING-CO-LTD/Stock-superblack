@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import {
   ClipboardCheck,
   PackagePlus,
@@ -8,6 +9,7 @@ import {
   RefreshCw,
   ShieldCheck,
   Users,
+  CalendarDays,
 } from "lucide-react";
 import { toast } from "sonner";
 import type { AdminData, Employee, Leave } from "@/lib/types";
@@ -48,6 +50,10 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+
+const SchedulePanel = dynamic(() => import("./schedule-panel").then((module) => module.SchedulePanel), {
+  loading: () => <p role="status">กำลังโหลดระบบสุ่มตาราง…</p>,
+});
 
 function NoResults({
   title,
@@ -250,7 +256,7 @@ export function AdminPanel() {
             </Card>
           </div>
           <Tabs defaultValue="leaves" className="min-w-0">
-            <TabsList className="h-auto max-w-full flex-wrap">
+            <TabsList className="grid w-full grid-cols-2 group-data-horizontal/tabs:h-auto sm:inline-flex sm:w-fit [&_[data-slot=tabs-trigger]]:h-8">
               <TabsTrigger value="leaves">
                 <ClipboardCheck />
                 อนุมัติการลา ({pending})
@@ -263,7 +269,14 @@ export function AdminPanel() {
                 <Users />
                 พนักงาน ({employees.length})
               </TabsTrigger>
+              <TabsTrigger value="schedules">
+                <CalendarDays />
+                สุ่มตารางงาน
+              </TabsTrigger>
             </TabsList>
+            <TabsContent value="schedules">
+              <SchedulePanel employees={employees} />
+            </TabsContent>
             <TabsContent value="leaves">
               <Card className="min-w-0">
                 <CardHeader>
